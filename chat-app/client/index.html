@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Chat</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #e5ddd5;
+        }
+        #chat {
+            max-width: 600px;
+            margin: auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        #messages {
+            list-style-type: none;
+            padding: 0;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .message-container {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 10px;
+            position: relative;
+            max-width: 80%;
+        }
+        .my-message {
+            background-color: #dcf8c6;
+            align-self: flex-end;
+            margin-left: auto;
+        }
+        .other-message {
+            background-color: #ffffff;
+            align-self: flex-start;
+            margin-right: auto;
+        }
+        #form {
+            display: flex;
+            margin-top: 10px;
+        }
+        #input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-right: 10px;
+        }
+        button {
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            background-color: #34b7f1;
+            color: white;
+            cursor: pointer;
+        }
+        #clear-btn {
+            margin-top: 10px;
+            background-color: #ff6347;
+        }
+    </style>
+</head>
+<body>
+    <div id="chat">
+        <div id="authentication">
+            <label for="name">Your Name:</label>
+            <input type="text" id="name">
+            <br>
+            <label for="securityCode">Security Code:</label>
+            <input type="text" id="securityCode">
+            <br>
+            <button onclick="connectWebSocket()">Connect</button>
+        </div>
+        <div id="chatInterface" style="display:none">
+            <ul id="messages"></ul>
+            <form id="form" onsubmit="sendMessage(event)">
+                <input id="input" autocomplete="off">
+                <button>Send</button>
+            </form>
+            <button id="clear-btn" onclick="clearMessages()">Clear Messages</button>
+        </div>
+    </div>
+
+    <script>
+        let socket;
+        let userName;
+
+        function connectWebSocket() {
+            userName = document.getElementById('name').value;
+            const securityCode = document.getElementById('securityCode').value;
+            socket = new WebSocket('wss://your-render-url');
+
+            socket.addEventListener('open', function (event) {
+                console.log('Connected to WebSocket');
+                socket.send(JSON.stringify({ type: 'auth', name: userName, securityCode }));
+            });
+
+            socket.addEventListener('message', function (event) {
+                const data = JSON.parse(event.data);
+                switch (data.type) {
+                    case 'auth_success':
+                        showChatInterface();
+                        loadMessages();
+                        break;
+                    case 'auth_failure':
+                        alert(data.message);
+                        break;
+                    case 'message':
+                        addMessage(data.name, data.message);
+                        saveMessage(data.name, data.message);
+                        break;
+                    default:
+                        console.log('Unknown message type:', data.type);
+                }
+            });
+        }
+
+        function sendMessage(event) {
+            event.preventDefault();
+            const message = document.getElementById('input').value;
+            socket.send(JSON.stringify({ type: 'message', message }));
+            addMessage(userName, message);
+            saveMessage(userName, message);
+            document.getElementById('input').value = '';
+        }
+
+        function showChatInterface() {
+            document.getElementById('authentication').style.display = 'none';
+            document.getElementById('chatInterface').style.display = 'block';
+        }
+
+        function addMessage(name, message) {
+            const messages = document.getElementById('messages');
+            const li = document.createElement('li');
+            li.classList.add('message-container');
+            li.innerHTML = `<div class="${name === userName ? 'my-message' : 'other-message'}">${name}: ${message}</div>`;
+            messages.appendChild(li);
+        }
+
+        function saveMessage(name, message) {
+            const messages = JSON.parse(localStorage.getItem('messages')) || [];
+            messages.push({ name, message });
+            localStorage.setItem('messages', JSON.stringify(messages));
+        }
+
+        function loadMessages() {
+            const messages = JSON.parse(localStorage.getItem('messages')) || [];
+            messages.forEach(({ name, message }) => addMessage(name, message));
+        }
+
+        function clearMessages() {
+            localStorage.removeItem('messages');
+            document.getElementById('messages').innerHTML = '';
+        }
+    </script>
+</body>
+</html>
